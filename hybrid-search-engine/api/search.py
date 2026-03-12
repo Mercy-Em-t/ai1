@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query
 
 from filters.filter import apply_filters
 from ranking.ranker import personalized_ranking, rank_results
+from services.analytics import log_search
 from services.cache import get_cache, set_cache
 from services.candidates import generate_candidates
 from services.intent import detect_intent
@@ -151,5 +152,15 @@ async def search(
     # Cache everything except query_time_ms
     cacheable = {k: v for k, v in response.items() if k != "query_time_ms"}
     set_cache(cache_key, cacheable, ttl=300)
+
+    # ── Analytics logging ─────────────────────────────────────────────────
+    log_search(
+        query=q,
+        corrected_query=corrected_display,
+        domain=domain,
+        results_count=total,
+        query_time_ms=query_time_ms,
+        user_id=user_id,
+    )
 
     return response

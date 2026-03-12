@@ -10,19 +10,56 @@ logger = logging.getLogger(__name__)
 _user_events: dict[str, list[dict]] = {}
 
 
-def record_event(user_id: str, item_id: str, event_type: str) -> None:
+def record_event(user_id: str, item_id: str, event_type: str, query: str | None = None) -> None:
     """Persist a user interaction in the in-memory store."""
     if user_id not in _user_events:
         _user_events[user_id] = []
-    _user_events[user_id].append(
-        {
-            "item_id": item_id,
-            "event_type": event_type,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    )
+    event: dict = {
+        "item_id": item_id,
+        "event_type": event_type,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if query:
+        event["query"] = query
+    _user_events[user_id].append(event)
+
+    # Feed intelligence layer
+    from services.intelligence import record_item_signal, record_query
+    if item_id and event_type in ("click", "purchase", "favorite", "skip"):
+        record_item_signal(item_id, event_type)
+    if query:
+        record_query(user_id, query)
+
+    # Feed discovery graph — strengthen category links from user paths
+    from services.discovery_graph import strengthen_category_link
+    if item_id:
+        from main import item_store
+        current_item = item_store.get(item_id)
+        if current_item:
+            current_cat = (current_item.get("category") or "").lower()
+            # Link current item's category to categories of recent interactions
+            recent = _user_events.get(user_id, [])[-5:]
+            for prev_ev in recent[:-1]:
+                prev_item = item_store.get(prev_ev.get("item_id", ""))
+                if prev_item:
+                    prev_cat = (prev_item.get("category") or "").lower()
+                    if prev_cat and current_cat and prev_cat != current_cat:
+                        strengthen_category_link(prev_cat, current_cat, 0.1)
+
+    # Feed knowledge graph — co-interactions and query→item links
+    from services.knowledge_graph import record_co_interaction, record_query_item_link
+    if item_id and query:
+        record_query_item_link(query, item_id)
+    if item_id:
+        recent = _user_events.get(user_id, [])[-5:]
+        for prev_ev in recent[:-1]:
+            prev_item_id = prev_ev.get("item_id", "")
+            if prev_item_id and prev_item_id != item_id:
+                record_co_interaction(prev_item_id, item_id)
+
     logger.info(
-        "Recorded event: user=%s item=%s type=%s", user_id, item_id, event_type
+        "Recorded event: user=%s item=%s type=%s query=%s",
+        user_id, item_id, event_type, query,
     )
 
 
@@ -37,7 +74,7 @@ def get_user_preferences(user_id: str) -> dict:
     if not events:
         return {"categories": {}, "tags": {}, "event_count": 0}
 
-    EVENT_WEIGHTS = {"click": 1, "purchase": 3, "skip": -1}
+    EVENT_WEIGHTS = {"click": 1, "purchase": 3, "favorite": 2, "skip": -1}
     category_scores: dict[str, float] = {}
     tag_scores: dict[str, float] = {}
 

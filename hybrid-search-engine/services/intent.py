@@ -1,4 +1,4 @@
-"""Keyword-based intent detection: classifies query into products / sports / events."""
+"""Keyword-based intent detection: classifies query into domains."""
 from __future__ import annotations
 
 import logging
@@ -17,7 +17,7 @@ _DOMAIN_KEYWORDS: dict[str, list[str]] = {
         "football", "nfl", "soccer", "basketball", "nba", "tennis", "wimbledon",
         "match", "game", "league", "tournament", "team", "player", "sport",
         "training", "camp", "coach", "racket", "ball", "gym", "fitness",
-        "championship", "playoff", "season",
+        "championship", "playoff", "season", "padel", "court", "courts",
     ],
     "events": [
         "concert", "show", "performance", "tour", "festival", "fest", "coachella",
@@ -25,12 +25,29 @@ _DOMAIN_KEYWORDS: dict[str, list[str]] = {
         "workshop", "seminar", "film", "movie", "cinema", "food", "wine",
         "burning man", "music", "gig", "live",
     ],
+    "services": [
+        "coaching", "service", "booking", "hire", "instructor", "trainer",
+        "photography", "dj", "catering", "consulting", "delivery",
+        "personal trainer", "private lessons",
+    ],
+    "venues": [
+        "venue", "studio", "center", "centre", "facility", "space",
+        "coworking", "ballroom", "hall", "arena", "stadium", "retreat",
+    ],
+    "courses": [
+        "course", "class", "lesson", "academy", "masterclass", "bootcamp",
+        "certification", "program", "curriculum", "tutorial", "learning",
+        "online course",
+    ],
 }
 
 
 def detect_intent(query: str) -> str:
     """
-    Return the best-matching domain: ``"products"``, ``"sports"``, or ``"events"``.
+    Return the best-matching domain for the query.
+
+    Supported domains: ``"products"``, ``"sports"``, ``"events"``,
+    ``"services"``, ``"venues"``, ``"courses"``.
 
     Falls back to ``"products"`` when the query is ambiguous.
     """

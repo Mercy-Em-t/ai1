@@ -111,8 +111,11 @@ class SearchEngine:
         """
         DOMAIN_CATEGORIES: dict[str, set[str]] = {
             "products": {"electronics", "clothing", "books"},
-            "sports": {"football", "basketball", "tennis"},
+            "sports": {"football", "basketball", "tennis", "sports"},
             "events": {"concerts", "conferences", "festivals"},
+            "services": {"services", "tennis", "sports", "wellness"},
+            "venues": {"sports", "conferences", "wellness"},
+            "courses": {"education", "sports", "tennis", "football", "basketball"},
         }
 
         query_tokens = _tokenize(query)

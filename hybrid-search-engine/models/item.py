@@ -10,6 +10,7 @@ class Item(BaseModel):
     title: str
     description: str
     category: str
+    type: Optional[str] = None  # product, event, venue, service, course, experience
     tags: list[str] = Field(default_factory=list)
     location: Optional[str] = None
     date: Optional[str] = None  # ISO date string e.g. "2024-06-15"
@@ -24,6 +25,7 @@ class ItemCreate(BaseModel):
     title: str
     description: str
     category: str
+    type: Optional[str] = None  # product, event, venue, service, course, experience
     tags: list[str] = Field(default_factory=list)
     location: Optional[str] = None
     date: Optional[str] = None
@@ -38,6 +40,7 @@ class ItemUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
+    type: Optional[str] = None
     tags: Optional[list[str]] = None
     location: Optional[str] = None
     date: Optional[str] = None
@@ -53,6 +56,7 @@ class ItemResponse(BaseModel):
     title: str
     description: str
     category: str
+    type: Optional[str] = None
     tags: list[str]
     location: Optional[str]
     date: Optional[str]
@@ -66,6 +70,7 @@ class ItemResponse(BaseModel):
 
 class UserEvent(BaseModel):
     user_id: str
-    item_id: str
-    event_type: str = Field(..., pattern="^(click|purchase|skip)$")
+    item_id: str = ""  # optional for search events
+    event_type: str = Field(..., pattern="^(search|click|purchase|favorite|skip)$")
+    query: Optional[str] = None  # search query context
     timestamp: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))

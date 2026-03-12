@@ -34,11 +34,14 @@ async def create_item(body: ItemCreate) -> ItemResponse:
 @router.get("", response_model=list[ItemResponse])
 async def list_items(
     category: str | None = Query(default=None),
+    type: str | None = Query(default=None, description="Filter by listing type: product, event, venue, service, course, experience"),
 ) -> list[ItemResponse]:
     store = _get_store()
     items = list(store.values())
     if category:
         items = [i for i in items if i.get("category", "").lower() == category.lower()]
+    if type:
+        items = [i for i in items if i.get("type", "").lower() == type.lower()]
     return [ItemResponse(**i) for i in items]
 
 
