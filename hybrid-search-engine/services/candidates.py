@@ -76,6 +76,21 @@ def generate_candidates(
             if item_id not in merged_scores or sim_score > merged_scores[item_id]:
                 merged_scores[item_id] = sim_score
 
+    # ── Knowledge graph expansion ────────────────────────────────────────────
+    try:
+        from services.knowledge_graph import expand_query_via_kg
+
+        kg_expansions = expand_query_via_kg(query, limit=limit)
+        if kg_expansions:
+            logger.info("Knowledge graph returned %d expansion candidates", len(kg_expansions))
+            for exp in kg_expansions:
+                exp_item_id = exp["item_id"]
+                kg_weight = exp["kg_weight"]
+                if exp_item_id not in merged_scores or kg_weight > merged_scores[exp_item_id]:
+                    merged_scores[exp_item_id] = kg_weight
+    except Exception:
+        pass  # KG not populated yet or other issue — graceful fallback
+
     # Retrieve item dicts from the store
     candidates: list[dict] = []
     for item_id in merged_scores:

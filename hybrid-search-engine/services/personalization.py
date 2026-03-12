@@ -46,6 +46,17 @@ def record_event(user_id: str, item_id: str, event_type: str, query: str | None 
                     if prev_cat and current_cat and prev_cat != current_cat:
                         strengthen_category_link(prev_cat, current_cat, 0.1)
 
+    # Feed knowledge graph — co-interactions and query→item links
+    from services.knowledge_graph import record_co_interaction, record_query_item_link
+    if item_id and query:
+        record_query_item_link(query, item_id)
+    if item_id:
+        recent = _user_events.get(user_id, [])[-5:]
+        for prev_ev in recent[:-1]:
+            prev_item_id = prev_ev.get("item_id", "")
+            if prev_item_id and prev_item_id != item_id:
+                record_co_interaction(prev_item_id, item_id)
+
     logger.info(
         "Recorded event: user=%s item=%s type=%s query=%s",
         user_id, item_id, event_type, query,

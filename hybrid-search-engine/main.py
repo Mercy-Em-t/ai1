@@ -58,6 +58,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.info("Semantic embeddings skipped (sentence-transformers not installed).")
 
+    # ── Populate knowledge graph from loaded items ──────────────────────────
+    from services.knowledge_graph import populate_from_items
+    populate_from_items(item_store)
+
     yield
     logger.info("Shutdown – clearing store.")
     item_store.clear()
@@ -85,6 +89,7 @@ from api.discovery import router as discovery_router
 from api.discovery_graph import router as discovery_graph_router
 from api.intelligence import router as intelligence_router
 from api.items import router as items_router
+from api.knowledge_graph import router as knowledge_graph_router
 from api.search import router as search_router
 from api.services_api import router as services_router
 from api.shops import router as shops_router
@@ -98,6 +103,7 @@ app.include_router(events_router)
 app.include_router(analytics_router)
 app.include_router(discovery_router)
 app.include_router(discovery_graph_router)
+app.include_router(knowledge_graph_router)
 app.include_router(shops_router)
 app.include_router(services_router)
 app.include_router(intelligence_router)
