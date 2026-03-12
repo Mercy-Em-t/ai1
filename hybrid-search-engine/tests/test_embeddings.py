@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from services.embeddings import compute_item_text, cosine_similarity
 
 
-class TestCosineSimiliarity:
+class TestCosineSimilarity:
     def test_identical_vectors(self):
         vec = [1.0, 2.0, 3.0]
         assert abs(cosine_similarity(vec, vec) - 1.0) < 1e-6
