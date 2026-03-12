@@ -10,19 +10,29 @@ logger = logging.getLogger(__name__)
 _user_events: dict[str, list[dict]] = {}
 
 
-def record_event(user_id: str, item_id: str, event_type: str) -> None:
+def record_event(user_id: str, item_id: str, event_type: str, query: str | None = None) -> None:
     """Persist a user interaction in the in-memory store."""
     if user_id not in _user_events:
         _user_events[user_id] = []
-    _user_events[user_id].append(
-        {
-            "item_id": item_id,
-            "event_type": event_type,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    )
+    event: dict = {
+        "item_id": item_id,
+        "event_type": event_type,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if query:
+        event["query"] = query
+    _user_events[user_id].append(event)
+
+    # Feed intelligence layer
+    from services.intelligence import record_item_signal, record_query
+    if item_id and event_type in ("click", "purchase", "favorite", "skip"):
+        record_item_signal(item_id, event_type)
+    if query:
+        record_query(user_id, query)
+
     logger.info(
-        "Recorded event: user=%s item=%s type=%s", user_id, item_id, event_type
+        "Recorded event: user=%s item=%s type=%s query=%s",
+        user_id, item_id, event_type, query,
     )
 
 
@@ -37,7 +47,7 @@ def get_user_preferences(user_id: str) -> dict:
     if not events:
         return {"categories": {}, "tags": {}, "event_count": 0}
 
-    EVENT_WEIGHTS = {"click": 1, "purchase": 3, "skip": -1}
+    EVENT_WEIGHTS = {"click": 1, "purchase": 3, "favorite": 2, "skip": -1}
     category_scores: dict[str, float] = {}
     tag_scores: dict[str, float] = {}
 

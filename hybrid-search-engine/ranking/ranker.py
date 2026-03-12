@@ -30,10 +30,11 @@ def rank_results(
 ) -> list[dict]:
     """
     Rank items by a weighted combination of:
-    - text relevance (40 %)
-    - popularity     (30 %)
-    - rating         (20 %)
-    - recency        (10 %)
+    - text relevance    (35 %)
+    - popularity        (25 %)
+    - rating            (20 %)
+    - behavior_score    (10 %)
+    - recency           (10 %)
 
     Returns items sorted descending by composite score; each item dict
     gets an injected ``_score`` key.
@@ -41,10 +42,18 @@ def rank_results(
     if not items:
         return []
 
+    from services.intelligence import compute_behavior_score
+
     query_scores = query_scores or {}
 
     # Normalise relevance scores to [0, 1]
     max_relevance = max(query_scores.values(), default=1.0) or 1.0
+
+    # Collect raw behavior scores and find max for normalisation
+    raw_behavior: dict[str, float] = {}
+    for item in items:
+        raw_behavior[item["id"]] = compute_behavior_score(item["id"])
+    max_behavior = max(raw_behavior.values(), default=1.0) or 1.0
 
     scored: list[tuple[float, dict]] = []
     for item in items:
@@ -52,9 +61,10 @@ def rank_results(
         rel = query_scores.get(item_id, 0.0) / max_relevance
         pop = (item.get("popularity") or 0.0) / 100.0
         rat = (item.get("rating") or 0.0) / 5.0
+        beh = raw_behavior[item_id] / max_behavior
         rec = _recency_score(item.get("date"))
 
-        composite = 0.40 * rel + 0.30 * pop + 0.20 * rat + 0.10 * rec
+        composite = 0.35 * rel + 0.25 * pop + 0.20 * rat + 0.10 * beh + 0.10 * rec
         item_copy = dict(item)
         item_copy["_score"] = round(composite, 6)
         scored.append((composite, item_copy))
@@ -95,7 +105,7 @@ def personalized_ranking(
     category_boost: dict[str, float] = {}
     tag_boost: dict[str, float] = {}
 
-    EVENT_WEIGHTS = {"click": 0.05, "purchase": 0.12, "skip": -0.05}
+    EVENT_WEIGHTS = {"click": 0.05, "purchase": 0.12, "favorite": 0.08, "skip": -0.05}
 
     for ev in events:
         weight = EVENT_WEIGHTS.get(ev.get("event_type", ""), 0.0)

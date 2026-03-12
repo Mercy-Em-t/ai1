@@ -15,19 +15,21 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 @router.post("", status_code=201)
 async def track_event(body: UserEvent) -> dict:
-    """Record a user interaction (click, purchase, or skip)."""
+    """Record a user interaction (search, click, purchase, favorite, or skip)."""
     record_event(
         user_id=body.user_id,
         item_id=body.item_id,
         event_type=body.event_type,
+        query=body.query,
     )
     logger.info(
-        "Event tracked: user=%s item=%s type=%s",
-        body.user_id, body.item_id, body.event_type,
+        "Event tracked: user=%s item=%s type=%s query=%s",
+        body.user_id, body.item_id, body.event_type, body.query,
     )
     return {
         "status": "recorded",
         "user_id": body.user_id,
         "item_id": body.item_id,
         "event_type": body.event_type,
+        "query": body.query,
     }

@@ -70,6 +70,7 @@ class ItemResponse(BaseModel):
 
 class UserEvent(BaseModel):
     user_id: str
-    item_id: str
-    event_type: str = Field(..., pattern="^(click|purchase|skip)$")
+    item_id: str = ""  # optional for search events
+    event_type: str = Field(..., pattern="^(search|click|purchase|favorite|skip)$")
+    query: Optional[str] = None  # search query context
     timestamp: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
