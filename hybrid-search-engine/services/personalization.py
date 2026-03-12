@@ -30,6 +30,22 @@ def record_event(user_id: str, item_id: str, event_type: str, query: str | None 
     if query:
         record_query(user_id, query)
 
+    # Feed discovery graph — strengthen category links from user paths
+    from services.discovery_graph import strengthen_category_link
+    if item_id:
+        from main import item_store
+        current_item = item_store.get(item_id)
+        if current_item:
+            current_cat = (current_item.get("category") or "").lower()
+            # Link current item's category to categories of recent interactions
+            recent = _user_events.get(user_id, [])[-5:]
+            for prev_ev in recent[:-1]:
+                prev_item = item_store.get(prev_ev.get("item_id", ""))
+                if prev_item:
+                    prev_cat = (prev_item.get("category") or "").lower()
+                    if prev_cat and current_cat and prev_cat != current_cat:
+                        strengthen_category_link(prev_cat, current_cat, 0.1)
+
     logger.info(
         "Recorded event: user=%s item=%s type=%s query=%s",
         user_id, item_id, event_type, query,

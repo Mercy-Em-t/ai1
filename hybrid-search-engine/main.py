@@ -82,6 +82,7 @@ app.add_middleware(
 # ── Routers ────────────────────────────────────────────────────────────────
 from api.analytics import router as analytics_router
 from api.discovery import router as discovery_router
+from api.discovery_graph import router as discovery_graph_router
 from api.intelligence import router as intelligence_router
 from api.items import router as items_router
 from api.search import router as search_router
@@ -96,6 +97,7 @@ app.include_router(suggest_router)
 app.include_router(events_router)
 app.include_router(analytics_router)
 app.include_router(discovery_router)
+app.include_router(discovery_graph_router)
 app.include_router(shops_router)
 app.include_router(services_router)
 app.include_router(intelligence_router)
