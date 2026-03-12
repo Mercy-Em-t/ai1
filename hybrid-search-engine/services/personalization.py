@@ -1,0 +1,64 @@
+"""User event history and preference management."""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
+
+# user_id → list of event dicts
+_user_events: dict[str, list[dict]] = {}
+
+
+def record_event(user_id: str, item_id: str, event_type: str) -> None:
+    """Persist a user interaction in the in-memory store."""
+    if user_id not in _user_events:
+        _user_events[user_id] = []
+    _user_events[user_id].append(
+        {
+            "item_id": item_id,
+            "event_type": event_type,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    logger.info(
+        "Recorded event: user=%s item=%s type=%s", user_id, item_id, event_type
+    )
+
+
+def get_user_preferences(user_id: str) -> dict:
+    """
+    Return a summary of what categories and tags the user likes/dislikes
+    based on their event history.
+    """
+    from main import item_store  # deferred import
+
+    events = _user_events.get(user_id, [])
+    if not events:
+        return {"categories": {}, "tags": {}, "event_count": 0}
+
+    EVENT_WEIGHTS = {"click": 1, "purchase": 3, "skip": -1}
+    category_scores: dict[str, float] = {}
+    tag_scores: dict[str, float] = {}
+
+    for ev in events:
+        weight = EVENT_WEIGHTS.get(ev.get("event_type", ""), 0)
+        item = item_store.get(ev.get("item_id", ""))
+        if item is None:
+            continue
+        cat = item.get("category", "")
+        if cat:
+            category_scores[cat] = category_scores.get(cat, 0.0) + weight
+        for tag in item.get("tags", []):
+            tag_scores[tag] = tag_scores.get(tag, 0.0) + weight
+
+    return {
+        "categories": category_scores,
+        "tags": tag_scores,
+        "event_count": len(events),
+    }
+
+
+def get_all_events() -> dict[str, list[dict]]:
+    """Return the raw event store (used by the ranker)."""
+    return _user_events
