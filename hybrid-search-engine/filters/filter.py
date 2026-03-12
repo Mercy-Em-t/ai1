@@ -28,6 +28,7 @@ def apply_filters(candidates: list[dict], filters: dict) -> list[dict]:
     - ``max_price``    : float
     - ``availability`` : bool
     - ``category``     : str  – exact match (case-insensitive)
+    - ``type``         : str  – exact match (case-insensitive), e.g. product/event/venue/service
     """
     if not filters:
         return candidates
@@ -39,6 +40,7 @@ def apply_filters(candidates: list[dict], filters: dict) -> list[dict]:
     max_price: float | None = filters.get("max_price")
     availability_filter: bool | None = filters.get("availability")
     category_filter: str | None = filters.get("category")
+    type_filter: str | None = filters.get("type")
 
     filtered: list[dict] = []
 
@@ -77,6 +79,11 @@ def apply_filters(candidates: list[dict], filters: dict) -> list[dict]:
         # Category filter
         if category_filter:
             if (item.get("category") or "").lower() != category_filter.lower():
+                continue
+
+        # Type filter
+        if type_filter:
+            if (item.get("type") or "").lower() != type_filter.lower():
                 continue
 
         filtered.append(item)

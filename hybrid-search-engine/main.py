@@ -65,8 +65,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Hybrid Search Engine",
-    description="A full hybrid search pipeline: TF-IDF + personalisation + filtering + ranking.",
-    version="1.0.0",
+    description="Universal discovery engine: TF-IDF + semantic search + personalisation + filtering + ranking. "
+    "Powers products, events, venues, services, courses, and experiences.",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -80,8 +81,11 @@ app.add_middleware(
 
 # ── Routers ────────────────────────────────────────────────────────────────
 from api.analytics import router as analytics_router
+from api.discovery import router as discovery_router
 from api.items import router as items_router
 from api.search import router as search_router
+from api.services_api import router as services_router
+from api.shops import router as shops_router
 from api.suggest import router as suggest_router
 from api.events import router as events_router
 
@@ -90,6 +94,9 @@ app.include_router(search_router)
 app.include_router(suggest_router)
 app.include_router(events_router)
 app.include_router(analytics_router)
+app.include_router(discovery_router)
+app.include_router(shops_router)
+app.include_router(services_router)
 
 
 @app.get("/health", tags=["health"])
