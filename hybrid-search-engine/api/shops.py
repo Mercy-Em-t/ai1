@@ -70,7 +70,8 @@ async def add_product_to_shop(shop_id: str, body: ItemCreate) -> ItemResponse:
     item_dict = body.model_dump()
     item_dict["id"] = item_id
     # Ensure type is set to "product" for shop listings
-    item_dict.setdefault("type", "product")
+    if not item_dict.get("type"):
+        item_dict["type"] = "product"
 
     item_store[item_id] = item_dict
     search_engine.index_item(item_dict)
