@@ -36,6 +36,28 @@ async def lifespan(app: FastAPI):
         search_engine.document_count,
         len(search_engine.vocabulary),
     )
+
+    # ── Generate semantic embeddings for all items ────────────────────────
+    try:
+        from services.embeddings import compute_item_text, encode_texts
+
+        items_needing_vectors = [
+            (iid, item)
+            for iid, item in item_store.items()
+            if item.get("vector") is None
+        ]
+        if items_needing_vectors:
+            texts = [compute_item_text(item) for _, item in items_needing_vectors]
+            vectors = encode_texts(texts)
+            if vectors is not None:
+                for (iid, item), vec in zip(items_needing_vectors, vectors):
+                    item["vector"] = vec
+                logger.info("Generated embeddings for %d items.", len(vectors))
+            else:
+                logger.info("Semantic embeddings skipped (model not available).")
+    except Exception:
+        logger.info("Semantic embeddings skipped (sentence-transformers not installed).")
+
     yield
     logger.info("Shutdown – clearing store.")
     item_store.clear()
@@ -57,13 +79,17 @@ app.add_middleware(
 )
 
 # ── Routers ────────────────────────────────────────────────────────────────
+from api.analytics import router as analytics_router
 from api.items import router as items_router
 from api.search import router as search_router
+from api.suggest import router as suggest_router
 from api.events import router as events_router
 
 app.include_router(items_router)
 app.include_router(search_router)
+app.include_router(suggest_router)
 app.include_router(events_router)
+app.include_router(analytics_router)
 
 
 @app.get("/health", tags=["health"])
