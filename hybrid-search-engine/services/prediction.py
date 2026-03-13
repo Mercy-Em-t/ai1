@@ -70,7 +70,7 @@ def get_predicted_interests(
         # Weight recent queries higher
         recent = history[-5:]
         for idx, q in enumerate(recent):
-            recency_weight = (idx + 1) / len(recent)  # 0.2..1.0
+            recency_weight = (idx + 1) / len(recent)  # first=1/N … last=1.0
             edges = _query_graph.get(q, {})
             total = sum(edges.values()) or 1
             for rel_q, count in edges.items():
