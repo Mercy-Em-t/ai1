@@ -66,6 +66,28 @@ def get_all_behavior_scores() -> dict[str, float]:
     return scores
 
 
+# ── Unmet Demand Tracking ────────────────────────────────────────────────
+# query (lowercase) → search count
+_unmet_demand: dict[str, int] = defaultdict(int)
+
+
+def record_unmet_demand(query: str) -> None:
+    """Record a zero-result query as unmet demand."""
+    q = query.lower().strip()
+    if q:
+        _unmet_demand[q] += 1
+        logger.info("Unmet demand recorded: query='%s' total=%d", q, _unmet_demand[q])
+
+
+def get_unmet_demand(limit: int = 20) -> list[dict[str, Any]]:
+    """Return the top unmet demand queries sorted by frequency."""
+    sorted_demand = sorted(_unmet_demand.items(), key=lambda x: x[1], reverse=True)
+    return [
+        {"query": q, "search_count": count}
+        for q, count in sorted_demand[:limit]
+    ]
+
+
 # ── Query Relationship Graph ─────────────────────────────────────────────
 # user_id → list of recent queries (ordered by time)
 _user_query_history: dict[str, list[str]] = defaultdict(list)
@@ -158,6 +180,7 @@ def get_dashboard_stats() -> dict[str, Any]:
             for iid, score in trending
         ],
         "query_graph_size": len(_query_graph),
+        "unmet_demand": get_unmet_demand(limit=10),
     }
 
 
@@ -166,3 +189,4 @@ def clear_intelligence() -> None:
     _item_signals.clear()
     _user_query_history.clear()
     _query_graph.clear()
+    _unmet_demand.clear()

@@ -15,6 +15,7 @@ from services.analytics import log_search
 from services.cache import get_cache, set_cache
 from services.candidates import generate_candidates
 from services.intent import detect_intent
+from services.intelligence import record_unmet_demand
 from services.personalization import get_all_events
 from utils.spell import correct_query
 from search.engine import search_engine
@@ -27,6 +28,100 @@ router = APIRouter(tags=["search"])
 def _build_cache_key(params: dict) -> str:
     serialized = json.dumps(params, sort_keys=True, default=str)
     return "search:" + hashlib.md5(serialized.encode()).hexdigest()
+
+
+def _zero_result_recovery(
+    query: str,
+    domain: str | None,
+    page_size: int,
+) -> tuple[list[dict], list[str]]:
+    """
+    Graceful recovery when the primary search pipeline returns zero results.
+
+    Returns ``(fallback_results, suggestions)`` where:
+    - *fallback_results* are the closest items found via knowledge graph
+      expansion and category broadening.
+    - *suggestions* are alternative query strings the user might try.
+    """
+    from main import item_store
+    from services.knowledge_graph import expand_query_via_kg, get_neighbors
+
+    fallback_ids: dict[str, float] = {}
+    suggestions: list[str] = []
+
+    # ── Strategy 1: Knowledge graph expansion ──────────────────────────
+    try:
+        kg_items = expand_query_via_kg(query, limit=page_size * 2)
+        for exp in kg_items:
+            iid = exp["item_id"]
+            fallback_ids[iid] = max(fallback_ids.get(iid, 0.0), exp["kg_weight"])
+    except Exception:
+        pass
+
+    # ── Strategy 2: Category broadening via KG neighbours ──────────────
+    try:
+        q_lower = query.lower().strip()
+        cat_node_id = f"cat:{q_lower}"
+        neighbors = get_neighbors(cat_node_id, limit=10)
+        for nb in neighbors:
+            if nb["node_type"] == "category":
+                cat_label = nb["label"]
+                if cat_label.lower() != q_lower:
+                    suggestions.append(cat_label)
+                # Follow to items in related categories
+                cat_items = get_neighbors(nb["node_id"], limit=page_size)
+                for ci in cat_items:
+                    if ci["node_type"] == "item":
+                        raw_id = ci["node_id"].replace("item:", "")
+                        fallback_ids[raw_id] = max(
+                            fallback_ids.get(raw_id, 0.0), 0.1
+                        )
+    except Exception:
+        pass
+
+    # ── Strategy 3: Semantic search fallback ──────────────────────────
+    try:
+        from services.candidates import _semantic_candidates
+
+        sem = _semantic_candidates(query, limit=page_size)
+        for iid, sim in sem.items():
+            if sim > 0.25:
+                fallback_ids[iid] = max(fallback_ids.get(iid, 0.0), sim)
+    except Exception:
+        pass
+
+    # ── Build suggestion strings from fallback item titles ────────────
+    seen_titles: set[str] = set()
+    for iid in sorted(fallback_ids, key=fallback_ids.get, reverse=True):
+        item = item_store.get(iid)
+        if item:
+            title = item.get("title", "")
+            if title and title.lower() not in seen_titles:
+                seen_titles.add(title.lower())
+                suggestions.append(title)
+        if len(suggestions) >= 5:
+            break
+
+    # Deduplicate suggestions while preserving order
+    unique_suggestions: list[str] = []
+    seen: set[str] = set()
+    for s in suggestions:
+        key = s.lower()
+        if key not in seen:
+            seen.add(key)
+            unique_suggestions.append(s)
+
+    # Resolve fallback items
+    sorted_fallback = sorted(fallback_ids.items(), key=lambda x: x[1], reverse=True)
+    fallback_results: list[dict] = []
+    for iid, score in sorted_fallback[:page_size]:
+        item = item_store.get(iid)
+        if item:
+            item_out = {k: v for k, v in item.items() if not k.startswith("_")}
+            item_out["score"] = round(score, 4)
+            fallback_results.append(item_out)
+
+    return fallback_results, unique_suggestions[:5]
 
 
 @router.get("/search")
@@ -133,6 +228,21 @@ async def search(
         item_out["score"] = item.get("_score")
         results.append(item_out)
 
+    # ── Phase 10: Graceful zero-result recovery ───────────────────────────
+    fallback_results: list[dict] = []
+    suggestions: list[str] = []
+
+    if total == 0:
+        logger.info("Phase 10 – Zero results: triggering graceful recovery")
+        fallback_results, suggestions = _zero_result_recovery(
+            effective_query, domain, page_size
+        )
+        record_unmet_demand(q)
+        logger.info(
+            "Phase 10 – Recovery: %d fallback results, %d suggestions",
+            len(fallback_results), len(suggestions),
+        )
+
     query_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
     logger.info(
         "=== Search pipeline end | results=%d total=%d time=%.2fms ===",
@@ -147,6 +257,8 @@ async def search(
         "corrected_query": corrected_display,
         "domain": domain,
         "query_time_ms": query_time_ms,
+        "suggestions": suggestions,
+        "fallback_results": fallback_results,
     }
 
     # Cache everything except query_time_ms
