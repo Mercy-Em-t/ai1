@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query
 
 from services.discovery_graph import (
     build_interest_profile,
+    compute_adaptive_exploration,
     discovery_rank,
     get_curiosity_items,
     get_related_categories,
@@ -36,9 +37,10 @@ async def balanced_discover(
     q: str | None = Query(default=None, description="Optional search query"),
     user_id: str | None = Query(default=None, description="User ID for personalisation"),
     limit: int = Query(default=10, ge=1, le=50),
-    exploration: float = Query(
-        default=0.20, ge=0.0, le=1.0,
-        description="Exploration weight (0 = pure precision, 1 = max diversity)",
+    exploration: float | None = Query(
+        default=None, ge=0.0, le=1.0,
+        description="Exploration weight (0 = pure precision, 1 = max diversity). "
+        "If omitted, the system adapts automatically based on user context.",
     ),
 ) -> dict[str, Any]:
     """Balanced discovery endpoint — returns four sections:
@@ -61,6 +63,18 @@ async def balanced_discover(
     store = _get_store()
     all_items = list(store.values())
 
+    # ── Adaptive exploration weight ──────────────────────────────────
+    # If the caller did not specify an exploration weight, compute an
+    # adaptive weight based on user context.  Explicit overrides are
+    # respected as-is.
+    if exploration is not None:
+        effective_exploration = exploration
+    else:
+        effective_exploration = compute_adaptive_exploration(
+            user_id=user_id,
+            has_exact_query=q is not None,
+        )
+
     # ── Top results (precision) ──────────────────────────────────────
     if q:
         vocabulary = search_engine.vocabulary
@@ -70,13 +84,13 @@ async def balanced_discover(
             candidates,
             query_scores=scores,
             user_id=user_id,
-            exploration_weight=exploration,
+            exploration_weight=effective_exploration,
         )
     else:
         top_ranked = discovery_rank(
             all_items,
             user_id=user_id,
-            exploration_weight=exploration,
+            exploration_weight=effective_exploration,
         )
 
     top_results = _clean(top_ranked[:limit])
@@ -120,7 +134,7 @@ async def balanced_discover(
         "total_top": len(top_results),
         "query": q,
         "user_id": user_id,
-        "exploration_weight": exploration,
+        "exploration_weight": effective_exploration,
     }
 
 

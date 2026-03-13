@@ -13,6 +13,7 @@ from services.intelligence import (
     get_item_signals,
     get_query_map,
     get_related_queries,
+    get_unmet_demand,
 )
 
 logger = logging.getLogger(__name__)
@@ -79,4 +80,21 @@ async def query_map(
     return {
         "query_map": graph,
         "total_nodes": len(graph),
+    }
+
+
+@router.get("/demand")
+async def demand(
+    limit: int = Query(default=20, ge=1, le=100),
+) -> dict[str, Any]:
+    """
+    Return top unmet demand — queries that users searched for
+    but received zero results. Ranked by frequency.
+
+    Use this to identify gaps in inventory or content.
+    """
+    items = get_unmet_demand(limit=limit)
+    return {
+        "unmet_demand": items,
+        "total": len(items),
     }
