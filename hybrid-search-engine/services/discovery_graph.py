@@ -251,6 +251,42 @@ def get_curiosity_items(user_id: str, limit: int = 5) -> list[dict]:
 # ── Balanced discovery ranking ───────────────────────────────────────────
 
 
+def compute_adaptive_exploration(
+    user_id: str | None = None,
+    has_exact_query: bool = False,
+) -> float:
+    """Dynamically compute exploration weight based on user context.
+
+    Ratios adapt to the user's situation:
+
+    =============================  ===========
+    Situation                      Exploration
+    =============================  ===========
+    New user (no history)          0.35
+    Returning user (some history)  0.20
+    Heavy user (lots of history)   0.15
+    Exact query match              0.10
+    =============================  ===========
+    """
+    if has_exact_query:
+        return 0.10  # user knows what they want
+
+    if not user_id:
+        return 0.35  # anonymous → more exploration
+
+    from services.personalization import get_all_events
+
+    events = get_all_events().get(user_id, [])
+    event_count = len(events)
+
+    if event_count == 0:
+        return 0.35  # new user → high exploration
+    elif event_count < 10:
+        return 0.25  # light user → moderate exploration
+    else:
+        return 0.15  # returning power user → lower exploration
+
+
 def discovery_rank(
     items: list[dict],
     query_scores: dict[str, float] | None = None,

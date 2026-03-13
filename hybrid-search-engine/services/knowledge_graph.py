@@ -258,6 +258,33 @@ def populate_from_items(item_store: dict[str, dict]) -> None:
                 add_node(tag_nid, "category", tag_lower)
             add_edge(f"item:{item_id}", tag_nid, "related_to", weight=0.5)
 
+    # ── Item similarity: connect items sharing tags ─────────────────────
+    # Build tag → item mapping, then link items sharing ≥2 tags
+    tag_to_items: dict[str, list[str]] = defaultdict(list)
+    for item_id, item in item_store.items():
+        for tag in item.get("tags", []):
+            tag_to_items[tag.lower()].append(item_id)
+
+    # Connect items that share tags (co-occurring items)
+    seen_pairs: set[tuple[str, str]] = set()
+    for tag, item_ids in tag_to_items.items():
+        if len(item_ids) > 20:
+            continue  # skip overly common tags to avoid noise
+        for i, id_a in enumerate(item_ids):
+            for id_b in item_ids[i + 1:]:
+                pair = (min(id_a, id_b), max(id_a, id_b))
+                if pair not in seen_pairs:
+                    seen_pairs.add(pair)
+                    add_edge(
+                        f"item:{id_a}", f"item:{id_b}",
+                        "related_to", weight=0.3,
+                    )
+
+    logger.info(
+        "Item similarity: created %d tag-based item connections",
+        len(seen_pairs),
+    )
+
     # ── Domain knowledge: inter-category relationships ────────────────
     _DOMAIN_RELATIONSHIPS = {
         "tennis": ["padel", "squash", "badminton", "sports"],

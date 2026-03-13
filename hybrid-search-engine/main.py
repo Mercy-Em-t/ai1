@@ -90,6 +90,7 @@ from api.discovery_graph import router as discovery_graph_router
 from api.intelligence import router as intelligence_router
 from api.items import router as items_router
 from api.knowledge_graph import router as knowledge_graph_router
+from api.prediction import router as prediction_router
 from api.search import router as search_router
 from api.services_api import router as services_router
 from api.shops import router as shops_router
@@ -104,6 +105,7 @@ app.include_router(analytics_router)
 app.include_router(discovery_router)
 app.include_router(discovery_graph_router)
 app.include_router(knowledge_graph_router)
+app.include_router(prediction_router)
 app.include_router(shops_router)
 app.include_router(services_router)
 app.include_router(intelligence_router)

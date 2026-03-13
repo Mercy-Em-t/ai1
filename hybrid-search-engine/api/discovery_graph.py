@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query
 
 from services.discovery_graph import (
     build_interest_profile,
+    compute_adaptive_exploration,
     discovery_rank,
     get_curiosity_items,
     get_related_categories,
@@ -61,6 +62,17 @@ async def balanced_discover(
     store = _get_store()
     all_items = list(store.values())
 
+    # ── Adaptive exploration weight ──────────────────────────────────
+    # If the caller left exploration at the default (0.20), compute an
+    # adaptive weight based on user context.  Explicit overrides are
+    # respected as-is.
+    effective_exploration = exploration
+    if exploration == 0.20:  # default sentinel
+        effective_exploration = compute_adaptive_exploration(
+            user_id=user_id,
+            has_exact_query=q is not None,
+        )
+
     # ── Top results (precision) ──────────────────────────────────────
     if q:
         vocabulary = search_engine.vocabulary
@@ -70,13 +82,13 @@ async def balanced_discover(
             candidates,
             query_scores=scores,
             user_id=user_id,
-            exploration_weight=exploration,
+            exploration_weight=effective_exploration,
         )
     else:
         top_ranked = discovery_rank(
             all_items,
             user_id=user_id,
-            exploration_weight=exploration,
+            exploration_weight=effective_exploration,
         )
 
     top_results = _clean(top_ranked[:limit])
@@ -120,7 +132,7 @@ async def balanced_discover(
         "total_top": len(top_results),
         "query": q,
         "user_id": user_id,
-        "exploration_weight": exploration,
+        "exploration_weight": effective_exploration,
     }
 
 
