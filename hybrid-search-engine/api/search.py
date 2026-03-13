@@ -237,7 +237,7 @@ async def search(
         fallback_results, suggestions = _zero_result_recovery(
             effective_query, domain, page_size
         )
-        record_unmet_demand(q)
+        record_unmet_demand(q)  # Track original user query, not corrected form
         logger.info(
             "Phase 10 – Recovery: %d fallback results, %d suggestions",
             len(fallback_results), len(suggestions),

@@ -194,11 +194,20 @@ class TestUnmetDemandEndpoint:
 
     def test_successful_search_not_in_demand(self, client):
         """Searches with results should not appear in unmet demand."""
+        # First, perform a zero-result search to ensure tracking is active
+        client.get("/search", params={
+            "q": "forcedzeroresult",
+            "location": "xyznonexistentplace",
+        })
+        # Now perform a successful search
         client.get("/search", params={"q": "tennis"})
 
         resp = client.get("/intelligence/demand")
         data = resp.json()
+        # The zero-result query should be tracked
         demand_queries = [d["query"] for d in data["unmet_demand"]]
+        assert "forcedzeroresult" in demand_queries
+        # But the successful query should not
         assert "tennis" not in demand_queries
 
     def test_dashboard_includes_unmet_demand(self, client):
